@@ -1,0 +1,1 @@
+# prestashop_python_wrapper
