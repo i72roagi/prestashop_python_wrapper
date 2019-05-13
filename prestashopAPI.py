@@ -15,14 +15,15 @@ class PrestashopAPI(Thread):
     key -- clave del WebService de Prestashop
     function -- función a ejecutar cuando se cumpla
     """
+
     def __init__(self, url, key, function):
         super(PrestashopAPI, self).__init__()
         self.url = url
         self.key = key
         self.function = function
         self.cambios = ""
-        # self.productos = self._update_products()
-        # self.clientes = self._update_customers()
+        self.productos = self._update_products()
+        self.clientes = self._update_customers()
 
     def run(self):
         while True:
@@ -47,7 +48,7 @@ class PrestashopAPI(Thread):
 
         return needed
 
-    def update_products(self):
+    def _update_products(self):
         """
         Función que retorna la lista de productos de nuestra tienda online.
 
@@ -60,39 +61,46 @@ class PrestashopAPI(Thread):
         products = requests.get(self.url + "/products", auth=(self.key, ''))
         tree = ET.fromstring(products.text)
         for x in tree.iter('product'):
-            r = requests.get(self.url + "/products/" + x.attrib['id'], auth=(self.key, ''))
+            r = requests.get(self.url + "/products/" +
+                             x.attrib['id'], auth=(self.key, ''))
             product_id = ET.fromstring(r.text)
             product_id = product_id.find('product')
             if product_id.find('associations').find('combinations').text is None:
-                r = requests.get(self.url + "/stock_availables/" + x.attrib['id'], auth=(self.key, ''))
+                r = requests.get(self.url + "/stock_availables/" +
+                                 x.attrib['id'], auth=(self.key, ''))
                 stock_id = ET.fromstring(r.text)
                 stock_id = stock_id.find('stock_available')
-                if stock_id.find('quantity').text < product_id.find('low_stock_threshold').text:
+                if int(stock_id.find('quantity').text) < 50:
                     bajo_stock = True
                 else:
                     bajo_stock = False
                 productos.append({'nombre': product_id.find('name').find('language').text,
                                   'necesita_stock?': bajo_stock})
             else:
-                product_dict = {'nombre': product_id.find('name').find('language').text}
+                product_dict = {'nombre': product_id.find(
+                    'name').find('language').text}
                 for y in product_id.find('associations').find('combinations').findall('combination'):
-                    r = requests.get(self.url + "/combinations/" + y.find('id').text, auth=(self.key, ''))
+                    r = requests.get(self.url + "/combinations/" +
+                                     y.find('id').text, auth=(self.key, ''))
                     combination_id = ET.fromstring(r.text)
                     combination_id = combination_id.find('combination')
-                    if combination_id.find('quantity').text < combination_id.find('low_stock_threshold').text:
+                    if int(combination_id.find('quantity').text) < 50:
                         bajo_stock = True
                     else:
                         bajo_stock = False
-                    r = requests.get(self.url + "product_option_values/" + combination_id.find('associations').find('product_option_values').find('product_option_value').find('id').text, auth=(self.key, ''))
+                    r = requests.get(combination_id.find('associations').find(
+                            'product_option_values').find('product_option_value').attrib['{http://www.w3.org/1999/xlink}href'],
+							auth=(self.key, ''))
                     option_id = ET.fromstring(r.text)
-                    option_id = option_id.find('product_option_value').find('name').find('language').text
+                    option_id = option_id.find('product_option_value').find(
+                        'name').find('language').text
 
                     product_dict[option_id] = {'necesita_stock?': bajo_stock}
 
                 productos.append(product_dict)
         return productos
 
-    def update_customers(self):
+    def _update_customers(self):
         """
         Función que retorna la lista de clientes de nuestra tienda online.
 
@@ -105,7 +113,8 @@ class PrestashopAPI(Thread):
         customers = requests.get(self.url + "/customers", auth=(self.key, ''))
         tree = ET.fromstring(customers.text)
         for x in tree.iter('customer'):
-            r = requests.get(self.url + "/customers/" + x.attrib['id'], auth=(self.key, ''))
+            r = requests.get(self.url + "/customers/" +
+                             x.attrib['id'], auth=(self.key, ''))
             customer_id = ET.fromstring(r.text)
             customer_id = customer_id.find('customer')
             clientes.append({'nombre': customer_id.find('firstname').text,
@@ -114,10 +123,8 @@ class PrestashopAPI(Thread):
                              'fecha_nacimiento': customer_id.find('birthday').text})
         return clientes
 
-    @property
     def get_products(self):
         return self.productos
 
-    @property
     def get_customers(self):
         return self.clientes
