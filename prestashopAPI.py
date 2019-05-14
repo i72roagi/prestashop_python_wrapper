@@ -9,29 +9,39 @@ class PrestashopAPI(Thread):
     Clase que se encarga de comunicarse con la API de Prestashop.
 
     Mediante esta clase, se puede comunicar fácilmente con la API de Prestashop en Python, facilitando su uso.
-
     Parámetros:
-    url -- url de la tienda online de prestashop, debe llevar el 'http://' al principio y el '/api' al final
-    key -- clave del WebService de Prestashop
-    function -- función a ejecutar cuando se cumpla
+    url: str -- url de la tienda online de prestashop, debe llevar el 'http://' al principio y el '/api' al final
+    key: str -- clave del WebService de Prestashop
+    func_changes: Function -- función a ejecutar cuando haya algún cambio en la lista de productos
+    func_stock:Function -- función a ejecutar cuando haya algún producto bajo de stock
     """
 
-    def __init__(self, url, key, function):
+    def __init__(self, url, key, func_changes, func_stock):
+        """
+        Constructor de la clase PrestashopAPI, realiza una primera llamada a cargar los productos y clientes en el programa.
+        """
         super(PrestashopAPI, self).__init__()
         self.url = url
         self.key = key
-        self.function = function
+        self.func_changes = func_changes
+        self.func_stock = func_stock
         self.cambios = ""
         self.productos = self._update_products()
         self.clientes = self._update_customers()
 
     def run(self):
+        """
+        Función que se encarga de ejecutar el hilo y comprobar periódicamente cambios.
+        """
         while True:
             if self._get_changes():
-                self.function(self.cambios)
+                self.func_changes(self.cambios)
             sleep(300)
 
     def _get_changes(self):
+        """
+        Función que obtiene cambios en la lista de productos y/o clientes.
+        """
         change = False
         productos = self._update_products()
         clientes = self._update_customers()
@@ -44,6 +54,9 @@ class PrestashopAPI(Thread):
         return change
 
     def _need_supplies(self):
+        """
+        Función que comprueba si algún artículo está bajo de stock, avisándolo.
+        """
         needed = False
 
         return needed
@@ -55,7 +68,7 @@ class PrestashopAPI(Thread):
         Esta función recopila mediante llamadas a la API de Prestashop la lista de productos que se encuentran en
         nuestra tienda OnLine
 
-        :return: productos: List -- lista de productos en la tienda OnLine
+        :return: productos: Dict -- lista de productos en la tienda OnLine
         """
         productos = []
         products = requests.get(self.url + "/products", auth=(self.key, ''))
@@ -88,14 +101,18 @@ class PrestashopAPI(Thread):
                         bajo_stock = True
                     else:
                         bajo_stock = False
-                    r = requests.get(combination_id.find('associations').find(
-                            'product_option_values').find('product_option_value').attrib['{http://www.w3.org/1999/xlink}href'],
-							auth=(self.key, ''))
-                    option_id = ET.fromstring(r.text)
-                    option_id = option_id.find('product_option_value').find(
-                        'name').find('language').text
 
-                    product_dict[option_id] = {'necesita_stock?': bajo_stock}
+                    options = ""
+                    for option in combination_id.find('associations').find('product_option_values').findall('product_option_value'):
+                        r = requests.get(
+                            option.attrib['{http://www.w3.org/1999/xlink}href'], auth=(self.key, ''))
+                        option_id = ET.fromstring(r.text)
+                        option_id = option_id.find('product_option_value').find(
+                            'name').find('language').text
+                        options += option_id + ":"
+
+                    options = options[:len(options)-1]
+                    product_dict[options] = {'necesita_stock?': bajo_stock}
 
                 productos.append(product_dict)
         return productos
