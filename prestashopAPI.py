@@ -1,7 +1,8 @@
-import requests
+import xml.etree.ElementTree as ET
 from threading import Thread
 from time import sleep
-import xml.etree.ElementTree as ET
+
+import requests
 
 
 class PrestashopAPI(Thread):
@@ -40,7 +41,7 @@ class PrestashopAPI(Thread):
                 self.func_changes(self.cambios)
             if self._need_supplies():
                 self.func_stock(self.stock)
-            sleep(30)
+            sleep(300)
 
     def _get_changes(self):
         """
@@ -56,14 +57,14 @@ class PrestashopAPI(Thread):
                 for y in self.productos:
                     if x['nombre'] == y['nombre']:
                         cambia = False
-                if cambia == True:
+                if cambia:
                     self.cambios += "Añadido " + x['nombre'] + "\n"
             for x in self.productos:
                 cambia = True
                 for y in productos:
                     if x['nombre'] == y['nombre']:
                         cambia = False
-                if cambia == True:
+                if cambia:
                     self.cambios += "Eiiminado " + x['nombre'] + "\n"
         self.productos = productos
         self.clientes = self._update_customers()
@@ -76,7 +77,7 @@ class PrestashopAPI(Thread):
         self.stock = "Estos artículos necesitan re-stock:\n"
         needed = False
         for x in self.productos:
-            if x['necesita_stock?'] == True:
+            if x['necesita_stock?']:
                 needed = True
                 self.stock += x['nombre']
 
@@ -99,7 +100,8 @@ class PrestashopAPI(Thread):
             r = requests.get(x.attrib['{http://www.w3.org/1999/xlink}href'], auth=(self.key, ''))
             product_id = ET.fromstring(r.text)
             product_id = product_id.find('product')
-            r = requests.get(product_id.find('associations').find('stock_availables').find('stock_available').attrib['{http://www.w3.org/1999/xlink}href'], auth=(self.key, ''))
+            r = requests.get(product_id.find('associations').find('stock_availables').find('stock_available').attrib[
+                                 '{http://www.w3.org/1999/xlink}href'], auth=(self.key, ''))
             stock_id = ET.fromstring(r.text)
             stock_id = stock_id.find('stock_available')
             if int(stock_id.find('quantity').text) < 50:
@@ -107,7 +109,7 @@ class PrestashopAPI(Thread):
             else:
                 bajo_stock = False
             productos.append({'nombre': product_id.find('name').find('language').text,
-                                  'necesita_stock?': bajo_stock})
+                              'necesita_stock?': bajo_stock})
         return productos
 
     def _update_customers(self):
