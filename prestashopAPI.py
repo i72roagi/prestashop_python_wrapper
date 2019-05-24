@@ -1,7 +1,8 @@
-import requests
+import xml.etree.ElementTree as ET
 from threading import Thread
 from time import sleep
-import xml.etree.ElementTree as ET
+
+import requests
 
 
 class PrestashopAPI(Thread):
@@ -38,6 +39,7 @@ class PrestashopAPI(Thread):
         """
         Función que se encarga de ejecutar el hilo y comprobar periódicamente cambios.
         """
+<<<<<<< HEAD
         while self.estado:
             try:
                 if self._get_changes():
@@ -58,6 +60,14 @@ class PrestashopAPI(Thread):
 
     def stop(self):
         self.estado = False
+=======
+        while True:
+            if self._get_changes():
+                self.func_changes(self.cambios)
+            if self._need_supplies():
+                self.func_stock(self.stock)
+            sleep(300)
+>>>>>>> 63c706e8280d1e463fb6fb7b4a14d4a175773d8b
 
     def _get_changes(self):
         """
@@ -74,17 +84,27 @@ class PrestashopAPI(Thread):
                 for y in self.productos:
                     if x['nombre'] == y['nombre']:
                         cambia = False
+<<<<<<< HEAD
                 if cambia == True:
                     self.cambios += str(cont) + ".- " + "Añadido " + x['nombre'] + "\n"
                     cont += 1
+=======
+                if cambia:
+                    self.cambios += "Añadido " + x['nombre'] + "\n"
+>>>>>>> 63c706e8280d1e463fb6fb7b4a14d4a175773d8b
             for x in self.productos:
                 cambia = True
                 for y in productos:
                     if x['nombre'] == y['nombre']:
                         cambia = False
+<<<<<<< HEAD
                 if cambia == True:
                     self.cambios += str(cont) + ".- " + "Eiiminado " + x['nombre'] + "\n"
                     cont += 1
+=======
+                if cambia:
+                    self.cambios += "Eiiminado " + x['nombre'] + "\n"
+>>>>>>> 63c706e8280d1e463fb6fb7b4a14d4a175773d8b
         self.productos = productos
         self.clientes = self._update_customers()
         return change
@@ -97,7 +117,7 @@ class PrestashopAPI(Thread):
         self.stock = "Estos artículos necesitan re-stock:\n"
         needed = False
         for x in self.productos:
-            if x['necesita_stock?'] == True:
+            if x['necesita_stock?']:
                 needed = True
                 self.stock += str(cont) + ".- " + x['nombre']
                 cont += 1
@@ -122,8 +142,13 @@ class PrestashopAPI(Thread):
                 x.attrib['{http://www.w3.org/1999/xlink}href'], auth=(self.key, ''))
             product_id = ET.fromstring(r.text)
             product_id = product_id.find('product')
+<<<<<<< HEAD
             r = requests.get(product_id.find('associations').find('stock_availables').find(
                 'stock_available').attrib['{http://www.w3.org/1999/xlink}href'], auth=(self.key, ''))
+=======
+            r = requests.get(product_id.find('associations').find('stock_availables').find('stock_available').attrib[
+                                 '{http://www.w3.org/1999/xlink}href'], auth=(self.key, ''))
+>>>>>>> 63c706e8280d1e463fb6fb7b4a14d4a175773d8b
             stock_id = ET.fromstring(r.text)
             stock_id = stock_id.find('stock_available')
             if int(stock_id.find('quantity').text) < 50:
