@@ -17,7 +17,7 @@ class PrestashopAPI(Thread):
     func_stock:Function -- función a ejecutar cuando haya algún producto bajo de stock
     """
 
-    def __init__(self, url, key, func_changes, func_stock):
+    def __init__(self, url, key, func_changes, func_stock, time):
         """
         Constructor de la clase PrestashopAPI, realiza una primera llamada a cargar los productos y clientes en el programa.
         """
@@ -28,6 +28,9 @@ class PrestashopAPI(Thread):
         self.func_stock = func_stock
         self.cambios = ""
         self.stock = ""
+        self.estado = True
+        self.time = time
+        self.valor = 0
         self.productos = self._update_products()
         self.clientes = self._update_customers()
 
@@ -35,12 +38,26 @@ class PrestashopAPI(Thread):
         """
         Función que se encarga de ejecutar el hilo y comprobar periódicamente cambios.
         """
-        while True:
-            if self._get_changes():
-                self.func_changes(self.cambios)
-            if self._need_supplies():
-                self.func_stock(self.stock)
-            sleep(30)
+        while self.estado:
+            try:
+                if self._get_changes():
+                    self.func_changes(self.cambios)
+                if self._need_supplies():
+                    self.func_stock(self.stock)
+                while self.valor < 1200:
+                    try:
+                        sleep(0.1)
+                        self.valor += 1
+                    except KeyboardInterrupt:
+                        self.valor = 12000
+                        print("Captado Ctrl-C")
+                self.valor = 0
+            except KeyboardInterrupt:
+                self.estado = False
+                print("Captado Ctrl-C")
+
+    def stop(self):
+        self.estado = False
 
     def _get_changes(self):
         """
@@ -48,6 +65,7 @@ class PrestashopAPI(Thread):
         """
         self.cambios = "Se han realizado los siguientes cambios:\n"
         change = False
+        cont = 1
         productos = self._update_products()
         if productos != self.productos:
             change = True
@@ -57,14 +75,16 @@ class PrestashopAPI(Thread):
                     if x['nombre'] == y['nombre']:
                         cambia = False
                 if cambia == True:
-                    self.cambios += "Añadido " + x['nombre'] + "\n"
+                    self.cambios += str(cont) + ".- " + "Añadido " + x['nombre'] + "\n"
+                    cont += 1
             for x in self.productos:
                 cambia = True
                 for y in productos:
                     if x['nombre'] == y['nombre']:
                         cambia = False
                 if cambia == True:
-                    self.cambios += "Eiiminado " + x['nombre'] + "\n"
+                    self.cambios += str(cont) + ".- " + "Eiiminado " + x['nombre'] + "\n"
+                    cont += 1
         self.productos = productos
         self.clientes = self._update_customers()
         return change
@@ -73,12 +93,14 @@ class PrestashopAPI(Thread):
         """
         Función que comprueba si algún artículo está bajo de stock, avisándolo.
         """
+        cont = 1
         self.stock = "Estos artículos necesitan re-stock:\n"
         needed = False
         for x in self.productos:
             if x['necesita_stock?'] == True:
                 needed = True
-                self.stock += x['nombre']
+                self.stock += str(cont) + ".- " + x['nombre']
+                cont += 1
 
         return needed
 
@@ -96,10 +118,12 @@ class PrestashopAPI(Thread):
         tree = ET.fromstring(products.text)
         tree.find('products')
         for x in tree.iter('product'):
-            r = requests.get(x.attrib['{http://www.w3.org/1999/xlink}href'], auth=(self.key, ''))
+            r = requests.get(
+                x.attrib['{http://www.w3.org/1999/xlink}href'], auth=(self.key, ''))
             product_id = ET.fromstring(r.text)
             product_id = product_id.find('product')
-            r = requests.get(product_id.find('associations').find('stock_availables').find('stock_available').attrib['{http://www.w3.org/1999/xlink}href'], auth=(self.key, ''))
+            r = requests.get(product_id.find('associations').find('stock_availables').find(
+                'stock_available').attrib['{http://www.w3.org/1999/xlink}href'], auth=(self.key, ''))
             stock_id = ET.fromstring(r.text)
             stock_id = stock_id.find('stock_available')
             if int(stock_id.find('quantity').text) < 50:
@@ -107,7 +131,7 @@ class PrestashopAPI(Thread):
             else:
                 bajo_stock = False
             productos.append({'nombre': product_id.find('name').find('language').text,
-                                  'necesita_stock?': bajo_stock})
+                              'necesita_stock?': bajo_stock})
         return productos
 
     def _update_customers(self):
